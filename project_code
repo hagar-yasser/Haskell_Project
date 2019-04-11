@@ -1,0 +1,123 @@
+import System.Random
+import System.IO.Unsafe
+randomZeroToX :: Int -> Int
+randomZeroToX x= unsafePerformIO (getStdRandom (randomR (0, x)))
+users = ["A","B","C","D","E"]
+items=[ "item1" , "item2" , "item3" , "item4" , "item5" , "item6" ]
+purchases =[("user1 " , [ [ "item1" , "item2" , "item3" ] , [ "item1" , "item2" , "item4" ] ] ) ,
+           ("user2" , [ [ "item2" , "item5" ] , [ "item4" , "item5" ] ] ),
+           ("user3" , [ [ "item3" , "item2" ] ] ) ,
+           ("user4" , [ ] )]
+ 
+--recommend :: String -> [String] -> String
+
+
+createEmptyFreqList :: [String]->[(String,[b])]
+createEmptyFreqList [] = []
+createEmptyFreqList (x:xs) = (x ,[]) : createEmptyFreqList xs 
+
+-- I AM ASSUMING AN ITEM IS NOT FOUND MORE THAN ONCE IN THE SAME CART IF THIS IS WRONG
+-- THEN I NEED TO UPDATE THE noOfOccurences METHOD ONLY 
+contains ::Eq a =>[a]->a-> Bool
+contains [] _ =False
+
+contains (x:xs) a |x/=a =contains xs a
+                  |otherwise = True 
+
+ 
+
+--RETURNS THE NUMBER OF OCCURENCES OF 2 ITEMS TOGETHER IN A USER'S PURCHUASE HISTORY
+noOfOccurences :: String ->String -> [[String]] -> Int
+noOfOccurences _  _ [] =0
+noOfOccurences item a  (x:xs ) | contains x a && contains x item = 1+ (noOfOccurences item a xs)
+                               |otherwise =(noOfOccurences item a xs)
+--returns the list of items purchuased with this item
+itemsData :: String -> [String] -> [[String]]->[(String,Int)]
+itemsData _ [] _ =[]
+itemsData item (x:xs) carts = if x/=item && noOfOccurences item x carts > 0  then (x , noOfOccurences item x carts ) : itemsData item xs carts else itemsData item xs carts 
+
+-- IT TAKES THE ITEMS ARRAY 2TIMES TO LOOP ON ONE AND PASS THE OTHER TO ITEMSDATA
+allItemsData :: [String]->[String]->[[String]]-> [(String,[(String,Int)])]
+allItemsData [] _ _ = []
+allItemsData (x:xs) items carts = (x,itemsData x items carts) : allItemsData xs items carts
+
+
+getAllUsersStats :: [(String,[[String]])]->[(String,[(String,[(String ,Int)])])]
+getAllUsersStats [] =[]
+getAllUsersStats ( (user,carts):xs )= (user , allItemsData items items carts ): getAllUsersStats xs
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+purchasesIntersection :: Eq a => [(a,[(a,Int)])] -> [(a,[(a,[(a,Int)])])] -> [[(a,[(a,Int)])]]
+purchasesIntersection _ [] = []
+purchasesIntersection p (x:xs) =  [(generateListForUser p x)] ++ purchasesIntersection  p xs
+
+--functional: generates a list of the intersection of items bought with each item bought by the current user and user X 
+generateListForUser :: Eq a => [(a,[(a,Int)])] -> (a,[(a,[(a,Int)])]) -> [(a,[(a,Int)])]
+generateListForUser [] _ = []
+generateListForUser (i:is) x = putBack (getItem i (snd x)) ++ generateListForUser is x 
+
+--functional: takes a list of repeated items and removes repetitions while incrementing the frequencies
+putBack :: Eq a => [(a,[(a,Int)])] -> [(a,[(a,Int)])]
+putBack [] = []
+putBack (i:is) = (fst i,adjustFrequency (snd i) []):putBack is
+
+--functional: generates a list of items bought with item# by current user and user X
+getItem :: Eq a => (a,[(a,Int)]) -> [(a,[(a,Int)])] -> [(a,[(a,Int)])]
+getItem i (u:us) = if fst i == fst u then if (snd u /= [] && snd i /= []) then [(fst u,snd u ++ snd i)] else [] else getItem i us
+
+--functional [at last :)]: merges same elements of different frequencies 
+adjustFrequency :: Eq a => [(a,Int)] -> [(a,Int)] -> [(a,Int)]
+adjustFrequency [] acc = acc
+adjustFrequency (x:xs) acc | length (getRepeated x xs) == 1 && occurs x acc == False = adjustFrequency xs (acc++[x])
+						   | length (getRepeated x xs) == 1 && occurs x acc = adjustFrequency xs acc
+						   | length (getRepeated x xs) > 1 && occurs x acc == False = adjustFrequency xs (acc++[sumFrequency (getRepeated x xs)])
+						   | length (getRepeated x xs) > 1 && occurs x acc = adjustFrequency xs acc						   
+
+--functional: given an item and a list of items, the function extracts identical items from the list and puts them in another list
+getRepeated :: Eq a => (a,Int) -> [(a,Int)] -> [(a,Int)]
+getRepeated (t,ts) [] = [(t,ts)]
+getRepeated (t,ts) (z:zs) | t == fst z = z:getRepeated (t,ts) zs
+						  | otherwise = getRepeated (t,ts) zs
+						  
+--functional: sums the frequencies of a list of identical items	and returns only a tuple containing the item and the sum			 
+sumFrequency :: [(a,Int)] -> (a,Int)
+sumFrequency (x:xs) = (fst x, sumFrequencyHelper x xs)
+
+--functional: sums the frequencies of a list of identical items
+sumFrequencyHelper :: (a,Int) -> [(a,Int)] -> Int
+sumFrequencyHelper (t,ts) [] = ts
+sumFrequencyHelper (t,ts) (z:zs) = snd z + sumFrequencyHelper (t,ts) zs 				 
+
+--functional: decides whether the given tuple is a member of the input list or not
+occurs :: Eq a => (a,Int) -> [(a,Int)] -> Bool
+occurs _ [] = False
+occurs (t,ts) (z:zs) | t == fst z = True
+					 | otherwise = occurs (t,ts) zs
+				
+--functional: gets a compressed list of all items common between requested user and all the other users 				
+freqListUsers :: String -> [(String,Int)]
+freqListUsers s = adjustFrequency (flatten (purchasesIntersection (findUserPurchases s (getAllUsersStats [("user1" , [ [ "item1" , "item2" , "item3" ] , [ "item1" , "item2" , "item4" ] ] ) ,("user2" , [ [ "item2" , "item5" ] , [ "item4" , "item5" ] ] ),("user3" , [ [ "item3" , "item2" ] ] ) ,("user4" , [ ] )])) (findOthers s (getAllUsersStats [("user1" , [ [ "item1" , "item2" , "item3" ] , [ "item1" , "item2" , "item4" ] ] ) ,("user2" , [ [ "item2" , "item5" ] , [ "item4" , "item5" ] ] ),("user3" , [ [ "item3" , "item2" ] ] ) ,("user4" , [ ] )])))) []
+
+--functional: puts all lists of common items generated by purchasesIntersection into a list
+flatten :: [[(a,[(a,Int)])]] -> [(a,Int)]
+flatten [] = []
+flatten (x:xs) = flattenHelper x ++ flatten xs
+
+--functional: read the comment above flatten
+flattenHelper :: [(a,[(a,Int)])] -> [(a,Int)]
+flattenHelper [] = []
+flattenHelper (y:ys) = snd y ++ flattenHelper ys
+
+--functional: finds the requested user's purchases as a list
+findUserPurchases :: String -> [(String, [(String, [(String, Int)])])] -> [(String,[(String,Int)])]
+findUserPurchases _ [] = []
+findUserPurchases s (x:xs) | s == fst x = snd x
+						   | otherwise = findUserPurchases s xs
+						   
+--functional: finds all users but the requested user and puts them in a list						   
+findOthers :: String -> [(String, [(String, [(String, Int)])])] -> [(String,[(String,[(String,Int)])])]
+findOthers _ [] = []
+findOthers s (x:xs) | s /= fst x = x :findOthers s xs
+					| otherwise = findOthers s xs
+					
