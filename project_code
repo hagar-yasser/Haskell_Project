@@ -48,6 +48,7 @@ getAllUsersStats ( (user,carts):xs )= (user , allItemsData items items carts ): 
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+--functional: generates a list of lists of common items between the current user and every other user 
 purchasesIntersection :: Eq a => [(a,[(a,Int)])] -> [(a,[(a,[(a,Int)])])] -> [[(a,[(a,Int)])]]
 purchasesIntersection _ [] = []
 purchasesIntersection p (x:xs) =  [(generateListForUser p x)] ++ purchasesIntersection  p xs
