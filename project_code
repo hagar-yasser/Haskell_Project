@@ -122,3 +122,89 @@ findOthers _ [] = []
 findOthers s (x:xs) | s /= fst x = x :findOthers s xs
 					| otherwise = findOthers s xs
 					
+------------------------------------------------------------------------------------------------------
+
+countitemsouter :: [String] -> [(String,[(String, Int)])] -> [(String,Int)]
+countitemsouter [] _ = []
+countitemsouter (x:xs) l= [(x,countitemsinner x l )] ++ countitemsouter xs l
+countitemsinner :: String -> [(String,[(String,Int)])] -> Int
+countitemsinner _ [] = 0
+countitemsinner x ((y,y1):ys) = countitemsinnerhelper x y1 + countitemsinner x ys
+countitemsinnerhelper :: String -> [(String,Int)] -> Int
+countitemsinnerhelper _ [] =0
+countitemsinnerhelper x ((z,z1):zs) = if x==z then   z1 + countitemsinnerhelper x zs else countitemsinnerhelper x zs 
+del :: [(String,Int)] -> [(String,Int)]
+del [] = []
+del ((x,x1):xs) = if x1 /= 0 then (x,x1) : del xs else del xs
+findUser :: String -> [(String,[(String,[(String,Int)])])] -> [(String,[(String,Int)])]
+findUser _ [] = []
+findUser s ((x,x1):xs) | s==x = x1
+					   | otherwise = findUser s xs
+freqListItems :: String -> [(String,Int)]
+freqListItems s = del ( countitemsouter items ( findUser s (getAllUsersStats purchases) ) )
+-- dool btoo3 feqlistcart
+findItem :: String -> [(String,[(String,Int)])] -> [(String,Int)]
+findItem _ []=[]
+findItem s ((item,list):lists)= if item ==s then list else findItem s lists 
+findItemSS :: String -> [String] -> [(String,Int)]
+findItemSS _ []=[]
+findItemSS s (cart:carts) = findItem cart (findUser s (getAllUsersStats purchases)) ++ findItemSS s carts 
+sumfinallist :: [(String,Int)] -> [(String,Int)]
+sumfinallist [] =[]
+sumfinallist ((x,x1):xs) = [(x,x1+searchsameitem x xs)]++ sumfinallist(deleteall x xs)
+
+deleteall :: String -> [(String,Int)] -> [(String,Int)]
+deleteall _ [] = []
+deleteall s ((x,x1):xs) | s == x = deleteall s xs
+						| otherwise = (x,x1):deleteall s xs
+
+searchsameitem :: String -> [(String,Int)] -> Int
+searchsameitem _ []=0
+searchsameitem x ((y,y1):ys) | x==y = y1 + searchsameitem x ys
+							 | otherwise = searchsameitem x ys
+
+sumofboth :: [(String,Int)] -> [(String,Int)] ->[(String,Int)] --awl wa7ed bta3 freqlistitems mn countiouter wl tany freqlistcart wl talet l total
+sumofboth [] _ = []
+sumofboth ((x,x1):xs) l = (x,(search x l + x1)):sumofboth xs l 
+
+search :: String -> [(String,Int)] -> Int
+search _ [] = 0
+search x ((y,y1):ys) | x == y =y1
+					 |otherwise = search x ys
+
+freqListCart:: String ->[String] -> [(String, Int)]
+freqListCart user l = sumfinallist( findItemSS user l )
+freqListCartAndItems :: String -> [String] -> [(String,Int)]
+freqListCartAndItems s l =  del ( sumofboth (countitemsouter items ( findUser s (getAllUsersStats purchases) ) ) (freqListCart s l ) )
+
+--------------------------------------------------------
+
+recommendEmptyCart :: String -> String						
+recommendEmptyCart s | length (recommendEmptyCartHelper (freqListItems s) ) ==0 = " "
+                     | otherwise= recommendEmptyCartHelper (freqListItems s) !! randomZeroToX ( length (recommendEmptyCartHelper (freqListItems s) )-1 )
+recommendEmptyCartHelper  :: [(String,Int)] -> [String]
+recommendEmptyCartHelper []=[]
+recommendEmptyCartHelper ((x,x1):xs) = recommendEmptyCartHelper1 x x1 ++ recommendEmptyCartHelper xs
+recommendEmptyCartHelper1 :: String -> Int -> [String]
+recommendEmptyCartHelper1 _ 0 = []
+recommendEmptyCartHelper1 x x1= x:recommendEmptyCartHelper1 x (x1-1)	
+recommendBasedOnItemsInCart :: String -> [String] -> String
+recommendBasedOnItemsInCart s l = recommendEmptyCartHelper (freqListCartAndItems s l) !! randomZeroToX (length (recommendEmptyCartHelper (freqListCartAndItems s l))-1)
+
+recommendBasedOnUsers :: String -> String
+recommendBasedOnUsers s 
+                         | length (freqListUsers s) ==0 = " "
+					     | otherwise = recommendEmptyCartHelper (freqListUsers s ) !! randomZeroToX (length (recommendEmptyCartHelper (freqListUsers s ))-1)
+
+recommend :: String -> [String] -> String
+recommend s []  
+               | (recommendBasedOnUsers s) ==" " && (recommendEmptyCart s) ==" " =items !! randomZeroToX (length items)
+			   |(recommendBasedOnUsers s ) ==" " = recommendEmptyCart s
+			   |(recommendEmptyCart s) == " " =recommendBasedOnUsers s
+			   |otherwise = [(recommendBasedOnUsers s) ,(recommendEmptyCart s) ] !! randomZeroToX 1
+recommend s l |  (recommendBasedOnUsers s) ==" "  &&  ( recommendBasedOnItemsInCart s l) ==" "  = items !! randomZeroToX (length items)
+			  | (recommendBasedOnUsers s)== " " = recommendBasedOnItemsInCart s l
+			  | otherwise = [(recommendBasedOnUsers s), (recommendBasedOnItemsInCart s l)] !! randomZeroToX 1
+
+
+--recommend s l = [(recommendBasedOnUsers s),(recommendBasedOnItemsInCart s l )] !! randomZeroToX 1
